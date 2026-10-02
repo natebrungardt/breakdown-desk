@@ -22,14 +22,17 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   if (!updated?.length) return Response.json({ id, status: "approved" });
 
   const label = String(action.type).replace("_", " ");
-  await recordDecision({
-    incidentId: action.incident_id,
-    name: "action_approval",
-    output: { action_id: id, type: action.type, status: "approved" },
-    source: "human",
-    reason: `Approved from the dashboard: ${label} to ${action.recipient}`,
-    inputs: { action_id: id },
-  });
-  await emit(action.incident_id, "actions", "booked", `Approved by a person: ${label} to ${action.recipient}.`);
+  // The audit row and the feed event are independent, so write them together.
+  await Promise.all([
+    recordDecision({
+      incidentId: action.incident_id,
+      name: "action_approval",
+      output: { action_id: id, type: action.type, status: "approved" },
+      source: "human",
+      reason: `Approved from the dashboard: ${label} to ${action.recipient}`,
+      inputs: { action_id: id },
+    }),
+    emit(action.incident_id, "actions", "booked", `Approved by a person: ${label} to ${action.recipient}.`),
+  ]);
   return Response.json({ id, status: "approved" });
 }

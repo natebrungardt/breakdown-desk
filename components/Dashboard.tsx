@@ -25,8 +25,11 @@ export default function Dashboard() {
   const [offlineLayer, setOfflineLayer] = useState(-1);
   const [view, setView] = useState<IncidentView | null>(null);
   const [offlineApproved, setOfflineApproved] = useState<Set<number>>(new Set());
+  const [resetting, setResetting] = useState(false);
   const runId = useRef(0);
   const activeIncident = useRef<string | null>(null);
+  // Actions approved on screen whose POST has not finished yet; refreshes keep them approved.
+  const approving = useRef<Set<string>>(new Set());
 
   // Incident panel data: refetch whenever a new event arrives for the active incident, plus a
   // slow poll while it runs (also merges events, as a safety net if Realtime drops).
@@ -35,7 +38,9 @@ export default function Dashboard() {
       const res = await fetch(`/api/incidents/${id}`, { cache: "no-store" });
       if (!res.ok) return;
       const data: { view: IncidentView; events: FeedEvent[] } = await res.json();
-      setView(data.view);
+      // The user may have switched scenarios while this was in flight; drop stale replies.
+      if (activeIncident.current !== id) return;
+      setView(withApproving(data.view, approving.current));
       setEvents((prev) => {
         const known = new Set(prev.map((e) => e.id));
         const missing = data.events.filter((e) => !known.has(e.id));
@@ -56,8 +61,9 @@ export default function Dashboard() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "incident_events" }, (msg) => {
         const row = msg.new as FeedEvent;
         setEvents((prev) => (prev.some((e) => e.id === row.id) ? prev : [row, ...prev]));
+        if (row.incident_id !== activeIncident.current) return; // an earlier run still finishing in the background
         if (row.layer === "records") setComplete(true);
-        if (row.incident_id === activeIncident.current) void refreshView(row.incident_id);
+        void refreshView(row.incident_id);
       })
       .subscribe();
     return () => {
@@ -114,7 +120,16 @@ export default function Dashboard() {
     setOffline(false);
     setOfflineLayer(-1);
     setView(null);
-    await fetch("/api/reset", { method: "POST" }).catch(() => {});
+    // Reset deletes every incident, so no new run may start until it is done,
+    // or the delete could wipe the new incident mid-pipeline.
+    setResetting(true);
+    try {
+      await fetch("/api/reset", { method: "POST" });
+    } catch {
+      /* offline: nothing to clear */
+    } finally {
+      setResetting(false);
+    }
   }
 
   async function approve(index: number) {
@@ -124,8 +139,19 @@ export default function Dashboard() {
     }
     const id = view?.actions[index]?.id;
     if (!id || !incidentId) return;
-    await fetch(`/api/actions/${id}/approve`, { method: "POST" });
-    await refreshView(incidentId);
+    // Show it approved right away; the server round trips take about a second.
+    approving.current.add(id);
+    setView((v) => v && withApproving(v, approving.current));
+    try {
+      const res = await fetch(`/api/actions/${id}/approve`, { method: "POST" });
+      if (!res.ok) throw new Error(`approve API ${res.status}`);
+    } catch (err) {
+      console.warn("approve failed:", err);
+    } finally {
+      approving.current.delete(id);
+      // Confirms the approval, or puts the action back to pending if it failed.
+      await refreshView(incidentId);
+    }
   }
 
   async function run(s: Scenario) {
@@ -172,7 +198,7 @@ export default function Dashboard() {
               </div>
               <h1 className="display">Breakdown Desk.</h1>
             </div>
-            <ScenarioButtons scenarios={SCENARIOS} activeId={active?.id ?? null} onRun={run} onReset={reset} />
+            <ScenarioButtons scenarios={SCENARIOS} activeId={active?.id ?? null} onRun={run} onReset={reset} disabled={resetting} />
           </div>
         </div>
       </section>
@@ -203,4 +229,9 @@ export default function Dashboard() {
       </section>
     </main>
   );
+}
+
+function withApproving(view: IncidentView, ids: Set<string>): IncidentView {
+  if (!ids.size) return view;
+  return { ...view, actions: view.actions.map((a) => (a.id && ids.has(a.id) ? { ...a, approved: true } : a)) };
 }

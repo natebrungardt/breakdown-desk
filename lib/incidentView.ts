@@ -12,7 +12,7 @@ const AUDIT_LABEL: Record<string, string> = {
   tow_need: "Tow",
   recoverable: "Recoverable",
   shop_set: "Shop set",
-  shop_selection: "Shop",
+  quote_accept: "Shop",
   action_approval: "Approval",
 };
 
@@ -29,7 +29,7 @@ function auditValue(d: Row): string {
       return o.component ? `${o.component}, ${o.recoverable ? "in warranty" : "out of warranty"}` : "no policy";
     case "shop_set":
       return `${o.shops?.length ?? 0} shops`;
-    case "shop_selection":
+    case "quote_accept":
       return o.shop;
     case "action_approval":
       return o.auto_approved ? `auto-approved: ${o.auto_approved.join(", ")}` : `${String(o.type).replace("_", " ")} approved`;

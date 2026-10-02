@@ -5,9 +5,10 @@ type Props = {
   activeId: string | null;
   onRun: (s: Scenario) => void;
   onReset: () => void;
+  disabled?: boolean; // while a Reset is in flight
 };
 
-export default function ScenarioButtons({ scenarios, activeId, onRun, onReset }: Props) {
+export default function ScenarioButtons({ scenarios, activeId, onRun, onReset, disabled }: Props) {
   return (
     <div className="cta-row">
       {scenarios.map((s) => (
@@ -15,6 +16,7 @@ export default function ScenarioButtons({ scenarios, activeId, onRun, onReset }:
           key={s.id}
           type="button"
           className="btn btn-secondary"
+          disabled={disabled}
           style={activeId === s.id ? { borderColor: "var(--orange)" } : undefined}
           onClick={() => onRun(s)}
         >
@@ -25,7 +27,7 @@ export default function ScenarioButtons({ scenarios, activeId, onRun, onReset }:
           </span>
         </button>
       ))}
-      <button type="button" className="btn btn-secondary" onClick={onReset} title="Clear incidents, events and audit trail. Seed data is kept.">
+      <button type="button" className="btn btn-secondary" onClick={onReset} disabled={disabled} title="Clear incidents, events and audit trail. Seed data is kept.">
         Reset
       </button>
     </div>

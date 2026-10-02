@@ -9,9 +9,14 @@ import { decideTow } from "./decisions/towNeed";
 import { emit, step } from "./events";
 import { writeRecords } from "./records";
 import { resolveUnit } from "./units";
+import type { ActionRow } from "./actions";
 import type { FaultEvent, Source } from "./types";
 
-// Runs the six layers in order: Signals -> Units -> Decisions -> Counterparties -> Actions -> Records.
+// Feed wording for a drafted action and the party it goes to.
+const addressedTo = (a: ActionRow) =>
+  a.type === "shop_booking" ? `booking to ${a.recipient}` : a.type === "driver_sms" ? "SMS to driver" : `claim to ${a.recipient}`;
+
+// Runs the six layers in order: Signals -> Units -> Decisions -> Actions -> Counterparties -> Records.
 // Every step emits an event (the live feed) and every decision is written to the audit trail.
 
 export async function createIncident(source: Source, payload: unknown, fault: FaultEvent): Promise<string> {
@@ -102,13 +107,16 @@ export async function runPipeline(incidentId: string, fault: FaultEvent) {
       return;
     }
 
-    // 4. Counterparties
+    // 4. Actions: call the capable shops for quotes.
     await step(
       incidentId,
-      "counterparties",
+      "actions",
       "routing",
-      `Requesting quotes from ${candidates.length} capable shops.` + (recov.recoverable ? ` ${truck.make} dealer preferred under warranty.` : ""),
+      `Calling ${candidates.length} capable shops for quotes.` + (recov.recoverable ? ` ${truck.make} dealer preferred under warranty.` : ""),
     );
+
+    // 5. Counterparties: shops answer, the best quote is accepted, and the drafted
+    // booking, driver SMS and warranty claim are addressed to each party.
     const quotes = await requestQuotes(candidates, fault.category, tow, (q) =>
       emit(
         incidentId,
@@ -120,7 +128,7 @@ export async function runPipeline(incidentId: string, fault: FaultEvent) {
     const best = rankQuotes(quotes)[0];
     await recordDecision({
       incidentId,
-      name: "shop_selection",
+      name: "quote_accept",
       output: { shop_id: best.shop.id, shop: best.shop.name, total: best.total, etaHours: best.etaHours },
       source: "rule",
       reason: best.oemPreferred
@@ -128,18 +136,17 @@ export async function runPipeline(incidentId: string, fault: FaultEvent) {
         : "Soonest to arrive, then cheapest",
       inputs: { quotes: quotes.map((q) => ({ shop: q.shop.name, total: q.total, etaHours: q.etaHours, oem: q.oemPreferred })) },
     });
-    await step(incidentId, "counterparties", "booked", `${quotes.length} quotes received. ${best.shop.name} (${best.shop.city}) ranked first.`);
+    await step(incidentId, "counterparties", "booked", `${quotes.length} quotes received. Accepted ${best.shop.name} (${best.shop.city}).`);
 
-    // 5. Actions
     const actions = await draftActions(incidentId, { fault, unit, severity, tow, recov, best });
     const pending = actions.filter((a) => a.status === "pending").length;
     await step(
       incidentId,
-      "actions",
+      "counterparties",
       pending ? "review" : "booked",
       pending
-        ? `Drafted ${actions.length} actions (${actions.map((a) => a.type.replace("_", " ")).join(", ")}). ${pending} pending approval.`
-        : `Shop booking and driver SMS auto-approved.`,
+        ? `Drafted ${actions.map(addressedTo).join(", ")}. ${pending} pending approval.`
+        : `Shop booking to ${best.shop.name} and driver SMS auto-approved.`,
     );
 
     // 6. Records

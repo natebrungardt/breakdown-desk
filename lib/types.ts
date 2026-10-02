@@ -1,7 +1,7 @@
 // Shared types for the pipeline, API and dashboard.
 
-export type Layer = "signals" | "units" | "decisions" | "counterparties" | "actions" | "records";
-export const LAYER_ORDER: Layer[] = ["signals", "units", "decisions", "counterparties", "actions", "records"];
+export type Layer = "signals" | "units" | "decisions" | "actions" | "counterparties" | "records";
+export const LAYER_ORDER: Layer[] = ["signals", "units", "decisions", "actions", "counterparties", "records"];
 
 // Visual state of a feed row; maps to the .tk-state-* classes in globals.css.
 export type EventStatus = "live" | "routing" | "review" | "booked" | "filed" | "complete";

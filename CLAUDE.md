@@ -14,7 +14,7 @@ Purpose: a 2–3 minute live demo in an interview for a Forward-Deployed Enginee
 
 ## Architecture: six layers
 
-Signals → Units → Decisions → Counterparties → Actions → Records
+Signals → Units → Decisions → Actions → Counterparties → Records
 
 ```
 /app

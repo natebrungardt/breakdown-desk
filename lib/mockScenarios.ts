@@ -27,7 +27,7 @@ export function scenarioToView(s: Scenario, approved: Set<number>): import("./ty
   };
 }
 
-export const LAYERS = ["Signals", "Units", "Decisions", "Counterparties", "Actions", "Records"];
+export const LAYERS = ["Signals", "Units", "Decisions", "Actions", "Counterparties", "Records"];
 
 export const SCENARIOS: Scenario[] = [
   {
@@ -57,8 +57,8 @@ export const SCENARIOS: Scenario[] = [
       { layer: 2, state: "routing", text: "Severity STOP_NOW. Rule: critical oil pressure. LLM not called." },
       { layer: 2, state: "review", text: "Tow required. Decision flagged for approval." },
       { layer: 2, state: "live", text: "Engine under warranty (148k mi / 31 mo vs 500k mi / 60 mo). Claim recoverable." },
-      { layer: 3, state: "routing", text: "Requesting quotes from capable shops. OEM dealer preferred under warranty." },
-      { layer: 3, state: "booked", text: "3 quotes received. OEM dealer ranked first (under warranty)." },
+      { layer: 3, state: "routing", text: "Calling capable shops for quotes. OEM dealer preferred under warranty." },
+      { layer: 4, state: "booked", text: "3 quotes received. OEM dealer accepted (under warranty)." },
       { layer: 4, state: "review", text: "Drafted tow + shop booking, driver SMS and warranty claim. Pending approval." },
       { layer: 5, state: "filed", text: "Repair order and claim line written. Audit trail saved." },
     ],
@@ -90,8 +90,8 @@ export const SCENARIOS: Scenario[] = [
       { layer: 2, state: "routing", text: "Rules set floor: schedule_later. Asking LLM to triage." },
       { layer: 2, state: "live", text: "LLM: limp_to_shop, confidence 0.82. Final severity limp_to_shop." },
       { layer: 2, state: "live", text: "Aftertreatment under warranty (62k mi / 20 mo vs 300k mi / 36 mo). Claim recoverable." },
-      { layer: 3, state: "routing", text: "Requesting quotes. In warranty, so Volvo dealer preferred." },
-      { layer: 3, state: "booked", text: "3 quotes received. High Plains Volvo Trucks (North Platte) ranked first." },
+      { layer: 3, state: "routing", text: "Calling shops for quotes. In warranty, so Volvo dealer preferred." },
+      { layer: 4, state: "booked", text: "3 quotes received. High Plains Volvo Trucks (North Platte) accepted." },
       { layer: 4, state: "review", text: "Drafted shop booking, driver SMS and warranty claim. Pending approval." },
       { layer: 5, state: "filed", text: "Repair order and claim line written. Audit trail saved." },
     ],
@@ -122,8 +122,8 @@ export const SCENARIOS: Scenario[] = [
       { layer: 2, state: "routing", text: "Rules set floor: schedule_later. Asking LLM to triage." },
       { layer: 2, state: "live", text: "LLM: schedule_later, confidence 0.91. Final severity schedule_later." },
       { layer: 2, state: "live", text: "Tires out of warranty (276k mi vs 100k mi / 12 mo). No claim." },
-      { layer: 3, state: "routing", text: "Requesting quotes from tire shops." },
-      { layer: 3, state: "booked", text: "2 quotes received. Kearney Tire & Wheel ranked first." },
+      { layer: 3, state: "routing", text: "Calling tire shops for quotes." },
+      { layer: 4, state: "booked", text: "2 quotes received. Kearney Tire & Wheel accepted." },
       { layer: 4, state: "booked", text: "Shop booking and driver SMS auto-approved." },
       { layer: 5, state: "filed", text: "Repair order written. Audit trail saved." },
     ],

@@ -30,3 +30,21 @@ export type IncidentView = {
   actions: { id?: string; text: string; approved: boolean }[];
   records: { k: string; v: string }[];
 };
+
+// What the fault is about. Drives severity rules, warranty component and shop capability.
+export type Category = "oil_pressure" | "coolant_temp" | "dpf" | "tire_pressure" | "brakes" | "other";
+
+// The one shape every vendor payload is normalized into.
+export type FaultEvent = {
+  source: Source;
+  unitNumber: string;
+  category: Category;
+  spn: number | null; // J1939 suspect parameter number (null for driver messages)
+  fmi: number | null; // J1939 failure mode identifier
+  description: string;
+  location: string; // e.g. "I-80 W, MP 213"
+  lat: number;
+  lng: number;
+  occurredAt: string; // ISO timestamp
+  driverName?: string;
+};

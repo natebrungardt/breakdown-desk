@@ -16,6 +16,17 @@ export type Scenario = {
   steps: Step[];
 };
 
+// Offline fallback: the same panel shape the real API produces, from canned data.
+export function scenarioToView(s: Scenario, approved: Set<number>): import("./types").IncidentView {
+  return {
+    status: "offline",
+    summary: s.summary,
+    audit: s.audit,
+    actions: s.actions.map((a, i) => ({ text: a.text, approved: a.approved || approved.has(i) })),
+    records: [{ k: "Repair order", v: "sample data" }],
+  };
+}
+
 export const LAYERS = ["Signals", "Units", "Decisions", "Counterparties", "Actions", "Records"];
 
 export const SCENARIOS: Scenario[] = [

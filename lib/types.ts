@@ -26,8 +26,8 @@ export type FeedEvent = {
 export type IncidentView = {
   status: string;
   summary: { k: string; v: string; pill?: string }[];
-  audit: { k: string; v: string; reason: string; source: DecisionSource }[];
-  actions: { id?: string; text: string; approved: boolean }[];
+  audit: { k: string; v: string; reason: string; source: DecisionSource; needsApproval?: boolean }[];
+  actions: { id?: string; text: string; detail?: string; approved: boolean }[];
   records: { k: string; v: string }[];
 };
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildPayload } from "@/lib/mockPayloads";
-import { SCENARIOS, type Scenario } from "@/lib/mockScenarios";
+import { SCENARIOS, scenarioToView, type Scenario } from "@/lib/mockScenarios";
 import { browserClient } from "@/lib/supabaseBrowser";
-import { LAYER_ORDER, type FeedEvent } from "@/lib/types";
+import { LAYER_ORDER, type FeedEvent, type IncidentView } from "@/lib/types";
 import EventFeed from "./EventFeed";
 import IncidentPanel from "./IncidentPanel";
 import LayerBar from "./LayerBar";
@@ -23,7 +23,29 @@ export default function Dashboard() {
   const [events, setEvents] = useState<FeedEvent[]>([]); // all realtime rows, newest first
   const [complete, setComplete] = useState(false);
   const [offlineLayer, setOfflineLayer] = useState(-1);
+  const [view, setView] = useState<IncidentView | null>(null);
+  const [offlineApproved, setOfflineApproved] = useState<Set<number>>(new Set());
   const runId = useRef(0);
+  const activeIncident = useRef<string | null>(null);
+
+  // Incident panel data: refetch whenever a new event arrives for the active incident, plus a
+  // slow poll while it runs (also merges events, as a safety net if Realtime drops).
+  const refreshView = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/incidents/${id}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data: { view: IncidentView; events: FeedEvent[] } = await res.json();
+      setView(data.view);
+      setEvents((prev) => {
+        const known = new Set(prev.map((e) => e.id));
+        const missing = data.events.filter((e) => !known.has(e.id));
+        return missing.length ? [...missing, ...prev] : prev;
+      });
+      if (data.view.status !== "open") setComplete(true);
+    } catch {
+      /* transient; the next event or poll retries */
+    }
+  }, []);
 
   // Subscribe once; keep every incident_events row so none are lost before the POST returns an id.
   useEffect(() => {
@@ -35,14 +57,21 @@ export default function Dashboard() {
         const row = msg.new as FeedEvent;
         setEvents((prev) => (prev.some((e) => e.id === row.id) ? prev : [row, ...prev]));
         if (row.layer === "records") setComplete(true);
+        if (row.incident_id === activeIncident.current) void refreshView(row.incident_id);
       })
       .subscribe();
     return () => {
       sb.removeChannel(channel);
     };
-  }, []);
+  }, [refreshView]);
 
   const mine = useMemo(() => events.filter((e) => e.incident_id === incidentId), [events, incidentId]);
+
+  useEffect(() => {
+    if (!incidentId || offline || complete) return;
+    const t = setInterval(() => void refreshView(incidentId), 2000);
+    return () => clearInterval(t);
+  }, [incidentId, offline, complete, refreshView]);
 
   const layer = offline
     ? offlineLayer
@@ -75,14 +104,41 @@ export default function Dashboard() {
     if (runId.current === id) setOfflineLayer(6);
   }
 
+  async function reset() {
+    runId.current++;
+    activeIncident.current = null;
+    setActive(null);
+    setIncidentId(null);
+    setEvents([]);
+    setComplete(false);
+    setOffline(false);
+    setOfflineLayer(-1);
+    setView(null);
+    await fetch("/api/reset", { method: "POST" }).catch(() => {});
+  }
+
+  async function approve(index: number) {
+    if (offline) {
+      setOfflineApproved((prev) => new Set(prev).add(index));
+      return;
+    }
+    const id = view?.actions[index]?.id;
+    if (!id || !incidentId) return;
+    await fetch(`/api/actions/${id}/approve`, { method: "POST" });
+    await refreshView(incidentId);
+  }
+
   async function run(s: Scenario) {
     const id = ++runId.current;
+    activeIncident.current = null;
     setActive(s);
     setEvents([]);
     setComplete(false);
     setIncidentId(null);
     setOffline(false);
     setOfflineLayer(-1);
+    setView(null);
+    setOfflineApproved(new Set());
     const scenario = buildPayload(s.id);
     try {
       if (!browserClient() || !scenario) throw new Error("live mode unavailable");
@@ -93,7 +149,11 @@ export default function Dashboard() {
       });
       if (!res.ok) throw new Error(`signals API ${res.status}`);
       const { incidentId: newId } = await res.json();
-      if (runId.current === id) setIncidentId(newId);
+      if (runId.current === id) {
+        activeIncident.current = newId;
+        setIncidentId(newId);
+        void refreshView(newId);
+      }
     } catch (err) {
       console.warn("falling back to offline scenario:", err);
       await runOffline(s, id);
@@ -112,7 +172,7 @@ export default function Dashboard() {
               </div>
               <h1 className="display">Breakdown Desk.</h1>
             </div>
-            <ScenarioButtons scenarios={SCENARIOS} activeId={active?.id ?? null} onRun={run} />
+            <ScenarioButtons scenarios={SCENARIOS} activeId={active?.id ?? null} onRun={run} onReset={reset} />
           </div>
         </div>
       </section>
@@ -137,7 +197,7 @@ export default function Dashboard() {
               <span>Incident</span>
               <span className="line" />
             </div>
-            <IncidentPanel key={String(incidentId ?? active?.id)} scenario={offline ? active : null} layer={layer} />
+            <IncidentPanel view={offline && active ? scenarioToView(active, offlineApproved) : view} layer={layer} onApprove={approve} />
           </div>
         </div>
       </section>

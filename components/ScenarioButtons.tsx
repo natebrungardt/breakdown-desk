@@ -4,9 +4,10 @@ type Props = {
   scenarios: Scenario[];
   activeId: string | null;
   onRun: (s: Scenario) => void;
+  onReset: () => void;
 };
 
-export default function ScenarioButtons({ scenarios, activeId, onRun }: Props) {
+export default function ScenarioButtons({ scenarios, activeId, onRun, onReset }: Props) {
   return (
     <div className="cta-row">
       {scenarios.map((s) => (
@@ -24,6 +25,9 @@ export default function ScenarioButtons({ scenarios, activeId, onRun }: Props) {
           </span>
         </button>
       ))}
+      <button type="button" className="btn btn-secondary" onClick={onReset} title="Clear incidents, events and audit trail. Seed data is kept.">
+        Reset
+      </button>
     </div>
   );
 }

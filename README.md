@@ -103,6 +103,14 @@ npm run dev
 
 Open http://localhost:3000 and click a scenario button. The layer bar and the live feed fill in as the pipeline runs (with about 400 ms between steps so it stays readable). Approve pending actions from the incident panel. **Reset** clears incidents but keeps the reference data.
 
+### Tests
+
+```bash
+npm test
+```
+
+Vitest covers the safety logic with no database or OpenAI calls: driver keyword classification and location parsing, the severity rule floors, the "LLM can escalate but never downgrade" guarantee, the approval thresholds, and which drafted actions auto-approve. The Supabase writes and the live LLM call are exercised by the demo scenarios rather than unit tests.
+
 ### Sending a signal by hand
 
 The scenario buttons replay fixed payloads through `/api/scenarios/[id]`. To send your own payload, call the webhook with the shared secret:

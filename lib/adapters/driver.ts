@@ -10,12 +10,15 @@ type DriverPayload = {
   message?: string;
 };
 
+// Whole words only, most specific first: "boiling" must not match oil, "attempt" must not
+// match temp, "flatbed" must not match flat. Coolant goes before oil so "coolant is boiling
+// over" or "oil and coolant mixing" land on the engine-temperature rule.
 const KEYWORDS: [RegExp, Category][] = [
-  [/brake/i, "brakes"],
-  [/oil/i, "oil_pressure"],
-  [/coolant|overheat|temp/i, "coolant_temp"],
+  [/\bbrak(e|es|ing)\b/i, "brakes"],
+  [/\b(coolant|antifreeze|radiator|overheat(s|ing|ed)?|temp|temperature)\b/i, "coolant_temp"],
+  [/\boil\b/i, "oil_pressure"],
   [/\b(dpf|regen|aftertreatment)\b/i, "dpf"],
-  [/tire|tyre|psi|flat|blowout/i, "tire_pressure"],
+  [/\b(tires?|tyres?|psi|flat tire|blowout|blew a tire)\b/i, "tire_pressure"],
 ];
 
 export function adaptDriver(raw: unknown): FaultEvent {
@@ -26,7 +29,9 @@ export function adaptDriver(raw: unknown): FaultEvent {
   const category = KEYWORDS.find(([re]) => re.test(text))?.[1] ?? "other";
   const where = text.match(/(I-\d+)\s*([EW])?\b[^.]*?\bMP\s*(\d+)/i);
   const mp = where ? Number(where[3]) : null;
-  const pos = mp != null ? milepostToLatLng(mp) : milepostToLatLng(272); // no location given: assume mid-Nebraska
+  // No milepost: leave the position unknown. The pipeline stops before picking shops and
+  // asks dispatch to confirm where the truck is, rather than guessing a spot.
+  const pos = mp != null ? milepostToLatLng(mp) : null;
   const location = where ? `${where[1].toUpperCase()} ${(where[2] ?? "").toUpperCase()}, MP ${mp}`.replace("  ", " ") : "Location not given";
 
   return {
@@ -37,8 +42,8 @@ export function adaptDriver(raw: unknown): FaultEvent {
     fmi: null,
     description: text,
     location,
-    lat: pos.lat,
-    lng: pos.lng,
+    lat: pos?.lat ?? null,
+    lng: pos?.lng ?? null,
     occurredAt: p.receivedAt ?? new Date().toISOString(),
     driverName: p.driver?.name,
   };

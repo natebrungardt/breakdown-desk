@@ -43,8 +43,8 @@ export type FaultEvent = {
   fmi: number | null; // J1939 failure mode identifier
   description: string;
   location: string; // e.g. "I-80 W, MP 213"
-  lat: number;
-  lng: number;
+  lat: number | null; // null when the report gave no usable location (driver text without a milepost)
+  lng: number | null;
   occurredAt: string; // ISO timestamp
   driverName?: string;
 };

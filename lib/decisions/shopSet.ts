@@ -32,7 +32,7 @@ export const capabilityFor = (c: string) => CAPABILITY[c] ?? "engine";
 // distance, and put the truck's OEM dealer first when the repair is under warranty.
 export async function decideShopSet(
   incidentId: string,
-  fault: FaultEvent,
+  fault: FaultEvent & { lat: number; lng: number }, // the pipeline stops earlier when location is unknown
   unit: Unit,
   tow: boolean,
   underWarranty: boolean,

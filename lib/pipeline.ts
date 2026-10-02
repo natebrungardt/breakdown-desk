@@ -100,7 +100,24 @@ export async function runPipeline(incidentId: string, fault: FaultEvent) {
         : recov.reason,
     );
 
-    const candidates = await decideShopSet(incidentId, fault, unit, tow, recov.recoverable);
+    // No usable location: shops are ranked by distance, so stop here and hand it to a person
+    // rather than picking shops from a guessed spot.
+    if (fault.lat == null || fault.lng == null) {
+      await recordDecision({
+        incidentId,
+        name: "location",
+        output: { known: false },
+        source: "rule",
+        reason: "Report gave no milepost or GPS position; shops cannot be ranked by distance",
+        inputs: { location: fault.location, description: fault.description },
+        needsApproval: true,
+      });
+      await emit(incidentId, "decisions", "review", "No location in the report. Call the driver to confirm where the truck is before booking.");
+      await db.from("incidents").update({ status: "needs_review" }).eq("id", incidentId);
+      return;
+    }
+
+    const candidates = await decideShopSet(incidentId, { ...fault, lat: fault.lat, lng: fault.lng }, unit, tow, recov.recoverable);
     if (candidates.length === 0) {
       await emit(incidentId, "decisions", "review", "No capable shop found along the route. Escalate to dispatch.");
       await db.from("incidents").update({ status: "error" }).eq("id", incidentId);

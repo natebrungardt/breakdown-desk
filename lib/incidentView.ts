@@ -11,6 +11,7 @@ const AUDIT_LABEL: Record<string, string> = {
   severity: "Severity",
   tow_need: "Tow",
   recoverable: "Recoverable",
+  location: "Location",
   shop_set: "Shop set",
   quote_accept: "Shop",
   action_approval: "Approval",
@@ -27,6 +28,8 @@ function auditValue(d: Row): string {
       return o.tow ? "required" : "not needed";
     case "recoverable":
       return o.component ? `${o.component}, ${o.recoverable ? "in warranty" : "out of warranty"}` : "no policy";
+    case "location":
+      return o.known ? "known" : "unknown, call driver";
     case "shop_set":
       return `${o.shops?.length ?? 0} shops`;
     case "quote_accept":

@@ -38,6 +38,7 @@ The core logic is in [`lib/decisions/severity.ts`](lib/decisions/severity.ts):
 - **LLM for gray areas.** For ambiguous faults the rules set a minimum floor and the LLM classifies the fault with a confidence score. The final severity is the more severe of the two, so the LLM can escalate but never downgrade.
 - **Human in the loop.** Any `stop_now` result, or an LLM confidence below 0.7, is marked as needing approval.
 - **Fallback.** If the LLM is unavailable, the rule floor is used and the decision goes to a human.
+- **Unknowns fail safe.** A fault the rules can't classify floors at `limp_to_shop`, so it is never auto-approved. A driver report with no milepost stops before shop selection and asks dispatch to confirm the location instead of guessing one.
 - **Audit.** Each decision row records its source (`rule`, `llm` or `human`), its reason and its inputs.
 
 [`lib/llm.ts`](lib/llm.ts) is the only file that calls an AI provider (OpenAI, structured JSON output). Everything else is rules and templates.
@@ -52,7 +53,7 @@ The core logic is in [`lib/decisions/severity.ts`](lib/decisions/severity.ts):
 
 ## Stack
 
-Next.js (App Router) + TypeScript + Tailwind, Supabase (Postgres + Realtime), OpenAI SDK, deployed on Vercel. No auth and no orchestration framework.
+Next.js (App Router) + TypeScript + Tailwind, Supabase (Postgres + Realtime), OpenAI SDK, deployed on Vercel. No orchestration framework. No user login (see [Security notes](#security-notes)).
 
 ## Running locally
 
@@ -92,6 +93,7 @@ Then fill in `.env.local`:
 | `SUPABASE_SERVICE_ROLE_KEY` | Same page (service role). **Server only. Never expose it.** |
 | `OPENAI_API_KEY` | platform.openai.com |
 | `OPENAI_MODEL` | Optional. Defaults to `gpt-4o-mini`. |
+| `SIGNALS_WEBHOOK_SECRET` | Any long random string, e.g. `openssl rand -hex 32`. Required to call `/api/signals/*`; the webhook rejects every call while it is unset. |
 
 ### 4. Run
 
@@ -103,10 +105,10 @@ Open http://localhost:3000 and click a scenario button. The layer bar and the li
 
 ### Sending a signal by hand
 
-The scenario buttons post to the same webhook you can call yourself:
+The scenario buttons replay fixed payloads through `/api/scenarios/[id]`. To send your own payload, call the webhook with the shared secret:
 
 ```bash
-curl -X POST http://localhost:3000/api/signals/driver -H 'content-type: application/json' -d '{"channel":"sms","receivedAt":"2026-10-02T03:02:16Z","driver":{"name":"Marcus Hale"},"unitNumber":"4590","message":"Left rear drive tire is losing air slowly, about 3 psi an hour. Still rolling fine on I-80 E near MP 284."}'
+curl -X POST http://localhost:3000/api/signals/driver -H 'content-type: application/json' -H "x-webhook-secret: $SIGNALS_WEBHOOK_SECRET" -d '{"channel":"sms","receivedAt":"2026-10-02T03:02:16Z","driver":{"name":"Marcus Hale"},"unitNumber":"4590","message":"Left rear drive tire is losing air slowly, about 3 psi an hour. Still rolling fine on I-80 E near MP 284."}'
 ```
 
 The call returns `202 { incidentId }` right away, and the pipeline keeps running in the background. See [`lib/mockPayloads.ts`](lib/mockPayloads.ts) for example Geotab and Samsara payloads.
@@ -115,10 +117,20 @@ The call returns `202 { incidentId }` right away, and the pipeline keeps running
 
 | Method | Route | Purpose |
 |---|---|---|
-| `POST` | `/api/signals/[source]` | Ingest a fault (`geotab`, `samsara` or `driver`) |
+| `POST` | `/api/signals/[source]` | Ingest a fault (`geotab`, `samsara` or `driver`). Needs the `x-webhook-secret` header |
+| `POST` | `/api/scenarios/[id]` | Run one of the three demo scenarios (`oil`, `dpf`, `tire`) from the dashboard |
 | `GET` | `/api/incidents/[id]` | Incident with its truck, load, decisions, actions, records and events |
 | `POST` | `/api/actions/[id]/approve` | Human approval of a pending action |
 | `POST` | `/api/reset` | Clear runtime data |
+
+## Security notes
+
+This is a demo, and these are the trade-offs made on purpose:
+
+- **Keys.** The Supabase service-role key and the OpenAI key are read only in server code. The browser gets the anon key, and row-level security lets it read `incident_events` (the live feed) and nothing else.
+- **Webhook.** `/api/signals/*` accepts arbitrary payloads, so it requires a shared secret (`x-webhook-secret`) and fails closed when none is configured.
+- **Dashboard routes.** The scenario buttons, Approve and Reset are open so the demo works without a login. Scenarios can only replay the three fixed payloads, and every run counts toward a cap of 20 incidents per 10 minutes, which bounds LLM spend. Anyone with the URL can still approve an action or reset the demo. A real deployment would put the dashboard and these routes behind the fleet's SSO and record who approved each action.
+- **AI limits.** The LLM only classifies severity. It can escalate past the rule floor but never lower it, and it never writes messages or picks shops.
 
 ## Simplifications
 

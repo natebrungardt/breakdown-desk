@@ -32,7 +32,8 @@ export function applyRules(f: FaultEvent): Rule {
     case "dpf":
       return { floor: "schedule_later", hard: false, reason: "Aftertreatment fault" };
     default:
-      return { floor: "schedule_later", hard: false, reason: "Unclassified fault" };
+      // Unknown fault: never let it auto-approve. The LLM can still escalate to stop_now.
+      return { floor: "limp_to_shop", hard: false, reason: "Unclassified fault, floor set to limp_to_shop" };
   }
 }
 

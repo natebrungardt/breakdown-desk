@@ -168,12 +168,8 @@ export default function Dashboard() {
     const scenario = buildPayload(s.id);
     try {
       if (!browserClient() || !scenario) throw new Error("live mode unavailable");
-      const res = await fetch(`/api/signals/${scenario.source}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(scenario.payload),
-      });
-      if (!res.ok) throw new Error(`signals API ${res.status}`);
+      const res = await fetch(`/api/scenarios/${scenario.id}`, { method: "POST" });
+      if (!res.ok) throw new Error(`scenarios API ${res.status}`);
       const { incidentId: newId } = await res.json();
       if (runId.current === id) {
         activeIncident.current = newId;

@@ -1,7 +1,6 @@
-import type { FeedEvent } from "./Dashboard";
+import type { FeedEvent } from "@/lib/types";
 
-// Draft: rows arrive as props from the browser-side simulation.
-// Tomorrow this subscribes to incident_events via Supabase Realtime.
+// Rows come from incident_events (Supabase Realtime), newest first.
 export default function EventFeed({ events, running }: { events: FeedEvent[]; running: boolean }) {
   return (
     <div className="ticker-shell" style={{ marginTop: 0 }} aria-label="Live event feed">
@@ -20,14 +19,14 @@ export default function EventFeed({ events, running }: { events: FeedEvent[]; ru
             </span>
           </div>
         )}
-        {events.map((e) => (
+        {[...events].sort((a, b) => b.id - a.id).map((e) => (
           <div key={e.id} className="tk-row enter">
-            <span className="tk-ts">{e.ts}</span>
-            <span className={`tk-state tk-state-${e.state}`}>
+            <span className="tk-ts">{e.created_at.slice(11, 19)}Z</span>
+            <span className={`tk-state tk-state-${e.status}`}>
               <span className="tk-dot" />
-              {e.state.toUpperCase()}
+              {e.status.toUpperCase()}
             </span>
-            <span className="tk-txt">{e.text}</span>
+            <span className="tk-txt">{e.message}</span>
           </div>
         ))}
       </div>

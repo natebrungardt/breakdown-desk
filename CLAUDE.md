@@ -92,6 +92,6 @@ Layer bar → towNeed → Approve button. Never cut: live feed, severity triage,
 
 ## Current phase
 
-Setup only: scaffold folders, schema.sql + seed.sql, Supabase project with Realtime on incident_events, env vars (.env.local and Vercel), one deploy of the empty app. Do not build pipeline logic yet.
+Build the full pipeline.
 
 @AGENTS.md
